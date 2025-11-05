@@ -43,7 +43,7 @@
       touch-action: manipulation;
     }
 
-    .card{
+.card{
       width:min(920px, 94vw);
       border-radius:var(--card-br);
       background:linear-gradient(180deg, var(--card-bg1), var(--card-bg2));
@@ -54,30 +54,30 @@
       backdrop-filter: blur(6px);
       position:relative;
       overflow:visible;
+      margin-top:78px; /* 👈 espacio extra para los logos */
     }
 
-    /* --- LOGOS iguales tamaño --- */
-.logo-esquina{
-  position:absolute;
-  width:auto;
-  height: clamp(60px, 12vw, 90px); /* tamaño común adaptable */
-  border-radius:12px;
-  background:#fff;
-  padding:8px 12px;
-  box-shadow:0 6px 14px rgba(0,0,0,.25);
-}
-  .logo-izq-abs{
-  left:20px;
-  top:-60px;
-  height:100px;
-}
+    /* Estilos base para todos los logos de esquina */
+    .logo-esquina{
+      position:absolute;
+      top:-65px;
+      width:auto;
+      border-radius:12px;
+      background:#fff;
+      padding:6px 10px;
+      box-shadow:0 6px 14px rgba(0,0,0,.25);
+    }
 
-     
-  .logo-der-abs{
-  right:20px;
-  top:-60px;
-  height:100px;
-  }
+    /* Tamaño individual de cada logo */
+    .logo-izq-abs{ 
+      left:20px; 
+      height:56px;
+    }
+    .logo-der-abs{ 
+      right:20px; 
+      height:42px;
+      background:#f6f6f6;
+    }
     /* Logo MUCH */
     .logo-much{
       display:block;
@@ -130,6 +130,7 @@
   </main>
 </body>
 </html>
+
 
 
 
