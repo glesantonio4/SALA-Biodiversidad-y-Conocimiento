@@ -57,19 +57,27 @@
     }
 
     /* --- LOGOS iguales tamaño --- */
-   .logo-esquina{
+.logo-esquina{
   position:absolute;
-  height: clamp(56px, 12vw, 84px);   /* ↑ más grande: min 56px, escala con 12vw, máx 84px */
-  top: calc(-1 * clamp(48px, 9vw, 72px)); 
   width:auto;
+  height: clamp(60px, 12vw, 90px); /* tamaño común adaptable */
   border-radius:12px;
   background:#fff;
-  padding:8px 12px;                  
+  padding:8px 12px;
   box-shadow:0 6px 14px rgba(0,0,0,.25);
 }
-    .logo-izq-abs{ left:18px; }
-    .logo-der-abs{ right:18px; }
+  .logo-izq-abs{
+  left:20px;
+  top:-60px;
+  height:100px;
+}
 
+     
+  .logo-der-abs{
+  right:20px;
+  top:-60px;
+  height:100px;
+  }
     /* Logo MUCH */
     .logo-much{
       display:block;
@@ -122,6 +130,7 @@
   </main>
 </body>
 </html>
+
 
 
 
