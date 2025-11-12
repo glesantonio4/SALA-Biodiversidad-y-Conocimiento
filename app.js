@@ -1,6 +1,6 @@
 /* =================== Datos =================== */
 const params = new URLSearchParams(location.search);
-const SALA = params.get('sala') || 'Exploración';
+const SALA = params.get('sala') || 'biodiversidad';
 // Las preguntas se cargan desde `preguntas.json` en lugar de estar embebidas.
 const NUM_QUESTIONS = 6;
 const shuffle = a => a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
@@ -409,3 +409,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
     start();
   }
 });
+
