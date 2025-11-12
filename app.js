@@ -8,7 +8,109 @@ const shuffle = a => a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p
 // Placeholder: QUESTIONS se inicializará tras cargar el JSON.
 let QUESTIONS = [];
 
-// Función para cargar preguntas desde el archivo preguntas.json
+/* =============== SUPABASE: init + helpers (sin tocar tu UI) =============== */
+const SUPABASE_URL = 'https://qwgaeorsymfispmtsbut.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3Z2Flb3JzeW1maXNwbXRzYnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzODcyODUsImV4cCI6MjA3Nzk2MzI4NX0.FThZIIpz3daC9u8QaKyRTpxUeW0v4QHs5sHX2s1U1eo';
+let supabase = null;
+
+async function initSupabase() {
+  if (supabase) return supabase;
+  const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
+  supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  return supabase;
+}
+
+// Busca el id de la sala por su slug (ej: 'biodiversidad')
+async function getSalaIdBySlug(slug) {
+  await initSupabase();
+  if (!slug) return null;
+  const { data, error } = await supabase
+    .from('salas')
+    .select('id, slug')
+    .eq('slug', slug)
+    .maybeSingle();
+  if (error) console.warn('getSalaIdBySlug()', error.message);
+  return data?.id || null;
+}
+
+// Si no hay slug válido, toma cualquier sala existente o una usada en quizzes
+async function getAnySalaId() {
+  await initSupabase();
+  let { data, error } = await supabase.from('salas').select('id').limit(1);
+  if (!error && data?.length) return data[0].id;
+
+  ({ data, error } = await supabase
+    .from('quizzes')
+    .select('sala_id')
+    .not('sala_id', 'is', null)
+    .order('started_at', { ascending: false })
+    .limit(1));
+  if (!error && data?.length) return data[0].sala_id;
+
+  return null;
+}
+
+// Garantiza un participante_id (usa uno existente o crea uno vacío)
+async function ensureParticipanteId() {
+  await initSupabase();
+
+  // Usa uno ya usado en quizzes
+  let { data, error } = await supabase
+    .from('quizzes')
+    .select('participante_id')
+    .not('participante_id', 'is', null)
+    .order('started_at', { ascending: false })
+    .limit(1);
+  if (!error && data?.length) return data[0].participante_id;
+
+  // Toma cualquiera de participantes
+  ({ data, error } = await supabase
+    .from('participantes')
+    .select('id')
+    .limit(1));
+  if (!error && data?.length) return data[0].id;
+
+  // Crea uno vacío si el esquema lo permite
+  const ins = await supabase
+    .from('participantes')
+    .insert({})
+    .select('id')
+    .single();
+
+  if (ins.error) { console.warn('No se pudo crear participante:', ins.error.message); return null; }
+  return ins.data.id;
+}
+
+// Crea un registro en quizzes cuando empieza el juego (no afecta tu UI)
+async function startQuizInDB() {
+  try {
+    await initSupabase();
+    const sala_id = await getSalaIdBySlug(SALA) ?? await getAnySalaId();
+    const participante_id = await ensureParticipanteId();
+
+    const payload = {
+      sala_id,
+      participante_id,
+      started_at: new Date().toISOString(),
+      num_preguntas: NUM_QUESTIONS
+    };
+
+    const { data, error } = await supabase
+      .from('quizzes')
+      .insert(payload)
+      .select('id')
+      .single();
+
+    if (error) { console.warn('No se pudo crear quiz:', error.message); return null; }
+    sessionStorage.setItem('much_current_quiz_id', data.id);
+    return data.id;
+  } catch (e) {
+    console.warn('startQuizInDB error:', e?.message || e);
+    return null;
+  }
+}
+
+/* =================== Función para cargar preguntas =================== */
 async function loadPreguntas(){
   try{
     const resp = await fetch('preguntas.json', { cache: 'no-store' });
@@ -290,7 +392,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const start = async ()=>{
     try{
-      await loadPreguntas();
+      await loadPreguntas();     // llena QUESTIONS
+      await startQuizInDB();     // ⬅️ registra el inicio en Supabase con sala_id correcto
       if (welcome) welcome.classList.add('hidden');
       if (quizShell) quizShell.classList.remove('hidden');
       new UIManager({ elements, sound, confetti, prizeMgr });
