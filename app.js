@@ -1,91 +1,65 @@
 /* =================== Datos =================== */
 const params = new URLSearchParams(location.search);
-const SALA = params.get('sala') || 'biodiversidad';
-// Las preguntas se cargan desde `preguntas.json` en lugar de estar embebidas.
+const SALA = params.get('sala') || 'biodiversidad';   // <- slug por defecto para esta sala
 const NUM_QUESTIONS = 6;
 const shuffle = a => a.map(x=>[Math.random(),x]).sort((p,q)=>p[0]-q[0]).map(p=>p[1]);
 
-// Placeholder: QUESTIONS se inicializará tras cargar el JSON.
 let QUESTIONS = [];
 
-/* =============== SUPABASE: init + helpers (sin tocar tu UI) =============== */
+/* ========== Supabase: init + helpers (no alteran tu UI/flujo) ========== */
 const SUPABASE_URL = 'https://qwgaeorsymfispmtsbut.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3Z2Flb3JzeW1maXNwbXRzYnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzODcyODUsImV4cCI6MjA3Nzk2MzI4NX0.FThZIIpz3daC9u8QaKyRTpxUeW0v4QHs5sHX2s1U1eo';
 let supabase = null;
 
-async function initSupabase() {
+async function initSupabase(){
   if (supabase) return supabase;
   const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2');
   supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   return supabase;
 }
 
-// Busca el id de la sala por su slug (ej: 'biodiversidad')
-async function getSalaIdBySlug(slug) {
+/** Obtiene sala_id por slug; si no existe, intenta cualquiera disponible */
+async function getSalaIdBySlug(slug){
   await initSupabase();
-  if (!slug) return null;
-  const { data, error } = await supabase
-    .from('salas')
-    .select('id, slug')
-    .eq('slug', slug)
-    .maybeSingle();
-  if (error) console.warn('getSalaIdBySlug()', error.message);
-  return data?.id || null;
-}
-
-// Si no hay slug válido, toma cualquier sala existente o una usada en quizzes
-async function getAnySalaId() {
-  await initSupabase();
-  let { data, error } = await supabase.from('salas').select('id').limit(1);
+  // 1) por slug
+  let { data, error } = await supabase.from('salas').select('id, slug').eq('slug', slug).limit(1);
   if (!error && data?.length) return data[0].id;
 
-  ({ data, error } = await supabase
-    .from('quizzes')
-    .select('sala_id')
-    .not('sala_id', 'is', null)
-    .order('started_at', { ascending: false })
-    .limit(1));
-  if (!error && data?.length) return data[0].sala_id;
+  // 2) cualquiera
+  ({ data, error } = await supabase.from('salas').select('id').limit(1));
+  if (!error && data?.length) return data[0].id;
 
   return null;
 }
 
-// Garantiza un participante_id (usa uno existente o crea uno vacío)
-async function ensureParticipanteId() {
+/** Reutiliza/crea un participante_id */
+async function ensureParticipanteId(){
   await initSupabase();
 
-  // Usa uno ya usado en quizzes
+  // 1) alguno usado recientemente en quizzes
   let { data, error } = await supabase
     .from('quizzes')
     .select('participante_id')
-    .not('participante_id', 'is', null)
-    .order('started_at', { ascending: false })
+    .not('participante_id','is', null)
+    .order('started_at', { ascending:false })
     .limit(1);
   if (!error && data?.length) return data[0].participante_id;
 
-  // Toma cualquiera de participantes
-  ({ data, error } = await supabase
-    .from('participantes')
-    .select('id')
-    .limit(1));
+  // 2) de participantes
+  ({ data, error } = await supabase.from('participantes').select('id').limit(1));
   if (!error && data?.length) return data[0].id;
 
-  // Crea uno vacío si el esquema lo permite
-  const ins = await supabase
-    .from('participantes')
-    .insert({})
-    .select('id')
-    .single();
-
+  // 3) crear vacío
+  const ins = await supabase.from('participantes').insert({}).select('id').single();
   if (ins.error) { console.warn('No se pudo crear participante:', ins.error.message); return null; }
   return ins.data.id;
 }
 
-// Crea un registro en quizzes cuando empieza el juego (no afecta tu UI)
-async function startQuizInDB() {
-  try {
+/** Inserta un quiz al iniciar (guarda id en sessionStorage) */
+async function startQuizInDB(){
+  try{
     await initSupabase();
-    const sala_id = await getSalaIdBySlug(SALA) ?? await getAnySalaId();
+    const sala_id = await getSalaIdBySlug(SALA);
     const participante_id = await ensureParticipanteId();
 
     const payload = {
@@ -95,22 +69,18 @@ async function startQuizInDB() {
       num_preguntas: NUM_QUESTIONS
     };
 
-    const { data, error } = await supabase
-      .from('quizzes')
-      .insert(payload)
-      .select('id')
-      .single();
-
+    const { data, error } = await supabase.from('quizzes').insert(payload).select('id').single();
     if (error) { console.warn('No se pudo crear quiz:', error.message); return null; }
+
     sessionStorage.setItem('much_current_quiz_id', data.id);
     return data.id;
-  } catch (e) {
+  }catch(e){
     console.warn('startQuizInDB error:', e?.message || e);
     return null;
   }
 }
 
-/* =================== Función para cargar preguntas =================== */
+/* =================== Cargar preguntas =================== */
 async function loadPreguntas(){
   try{
     const resp = await fetch('preguntas.json', { cache: 'no-store' });
@@ -130,7 +100,6 @@ async function loadPreguntas(){
 class SoundFX{
   constructor(toggleEl){ this.toggleEl = toggleEl; this.ctx = null; }
   beep(freq=880, dur=0.15, type='sine', vol=0.08){
-    // ✅ Soporta ausencia del switch de sonido (portada o páginas sin el control)
     if (this.toggleEl && !this.toggleEl.checked) return;
     this.ctx = this.ctx || new (window.AudioContext||window.webkitAudioContext)();
     const o=this.ctx.createOscillator(), g=this.ctx.createGain();
@@ -184,7 +153,6 @@ class UIManager{
     this.state = { idx:0, selected:null, points:0, correct:0, locked:false, answers:[] };
     this.currentPrize = null;
 
-    // ⚡ Anti-trampa
     this.cheatingDetected = false;
 
     this.e.pillSala.textContent = `Sala: ${SALA}`;
@@ -195,27 +163,15 @@ class UIManager{
     this.startFocusDetection();
   }
 
-  startFocusDetection(){
-    window.addEventListener('blur', this.handleFocusLoss.bind(this));
-  }
-
+  startFocusDetection(){ window.addEventListener('blur', this.handleFocusLoss.bind(this)); }
   handleFocusLoss(){
     if (this.state.locked || this.cheatingDetected || this.state.idx >= QUESTIONS.length) return;
-    this.cheatingDetected = true;
-    this.state.locked = true;
-
+    this.cheatingDetected = true; this.state.locked = true;
     this.e.status.textContent = '🛑 ¡ATENCIÓN! Se detectó un cambio de ventana.';
     this.e.hint.textContent = 'Debes permanecer en esta pestaña. La ronda ha sido invalidada.';
-
-    [...this.e.options.querySelectorAll('.option-btn')].forEach(btn => {
-      btn.disabled = true;
-      btn.classList.add('option-btn--incorrect');
-    });
-
+    [...this.e.options.querySelectorAll('.option-btn')].forEach(btn => { btn.disabled = true; btn.classList.add('option-btn--incorrect'); });
     this.e.nextBtn.textContent = '❌ Finalizar e Intentar de Nuevo';
-    this.e.nextBtn.classList.remove('btn-primary');
-    this.e.nextBtn.classList.add('btn-danger');
-
+    this.e.nextBtn.classList.remove('btn-primary'); this.e.nextBtn.classList.add('btn-danger');
     this.sound.wrong();
   }
 
@@ -253,16 +209,11 @@ class UIManager{
     const pct = Math.min(100, (s.idx/QUESTIONS.length*100));
     e.bar.style.width = pct + '%';
 
-    // Si hubo trampa, vamos directo a resultados/penalización
     if (this.cheatingDetected) {
-      e.quizView.classList.add('d-none');
-      e.finalView.classList.remove('d-none');
-
+      e.quizView.classList.add('d-none'); e.finalView.classList.remove('d-none');
       e.finalTitle.textContent = '¡Ronda Invalidada! 🛑';
       e.finalMsg.textContent = 'Se detectó un intento de abandono de pestaña. Debes reintentar la ronda completa.';
-      e.giftRow.classList.add('d-none');
-      e.retryRow.classList.remove('d-none');
-
+      e.giftRow.classList.add('d-none'); e.retryRow.classList.remove('d-none');
       e.finalPoints.textContent = s.points.toString();
       e.finalCorrect.textContent = s.correct.toString();
       e.finalTotal.textContent = QUESTIONS.length.toString();
@@ -277,12 +228,10 @@ class UIManager{
         this.redirectToRegistration();
         return;
       } else {
-        e.quizView.classList.add('d-none');
-        e.finalView.classList.remove('d-none');
+        e.quizView.classList.add('d-none'); e.finalView.classList.remove('d-none');
         e.finalTitle.textContent = 'Buen intento 👀';
         e.finalMsg.textContent   = 'Explora el MUCH y vuelve a intentarlo.';
-        e.giftRow.classList.add('d-none');
-        e.retryRow.classList.remove('d-none');
+        e.giftRow.classList.add('d-none'); e.retryRow.classList.remove('d-none');
         e.finalPoints.textContent = s.points.toString();
         e.finalCorrect.textContent= s.correct.toString();
         e.finalTotal.textContent  = QUESTIONS.length.toString();
@@ -338,7 +287,6 @@ class UIManager{
   next(){
     const s=this.state, {e}=this;
     if (this.cheatingDetected) { location.reload(); return; }
-
     if(s.selected===null){ e.status.textContent='⚠️ Selecciona una respuesta para continuar.'; return; }
     e.nextBtn.disabled = true; setTimeout(()=>{ e.nextBtn.disabled=false; }, 180);
     s.idx+=1; this.render();
@@ -346,8 +294,6 @@ class UIManager{
 }
 
 /* =================== Instanciación segura para portada/index =================== */
-
-// Referencias a elementos del QUIZ (si no existen, quedan en null)
 const elements = {
   pillSala: document.getElementById('pillSala'),
   bar: document.getElementById('bar'),
@@ -380,10 +326,6 @@ const elements = {
 const sound    = new SoundFX(elements.soundToggle || null);
 const confetti = new Confetti(document.getElementById('confetti'));
 
-/** Arranque flexible:
- * - Si hay portada (welcome + startBtn), inicia al click.
- * - Si NO hay portada (index directo), auto-inicia.
- */
 document.addEventListener('DOMContentLoaded', ()=>{
   const welcome  = document.getElementById('welcome');
   const quizShell= document.getElementById('quizShell');
@@ -392,8 +334,8 @@ document.addEventListener('DOMContentLoaded', ()=>{
 
   const start = async ()=>{
     try{
-      await loadPreguntas();     // llena QUESTIONS
-      await startQuizInDB();     // ⬅️ registra el inicio en Supabase con sala_id correcto
+      await loadPreguntas();
+      await startQuizInDB();            // ← registra inicio en Supabase
       if (welcome) welcome.classList.add('hidden');
       if (quizShell) quizShell.classList.remove('hidden');
       new UIManager({ elements, sound, confetti, prizeMgr });
@@ -405,8 +347,6 @@ document.addEventListener('DOMContentLoaded', ()=>{
   if (startBtn && welcome) {
     startBtn.addEventListener('click', (e)=>{ e.preventDefault(); start(); });
   } else {
-    // No hay portada en esta página → inicia solo
     start();
   }
 });
-
