@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="es">
 <head> <!-- SAALA BIODIVERSIDAD -->
@@ -7,6 +8,10 @@
 
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
+  <style>
+    /* Oculta el botón de admin por defecto (solo visible añadiendo ?admin=1) */
+    .btn-admin { display: none; }
+  </style>
 </head>
 <body>
   <canvas id="confetti" class="confetti-canvas"></canvas>
@@ -17,10 +22,14 @@
   <!-- 🔁 REDIRECCIÓN: si entras directo a index, te llevo a portada con sala=biodiversidad -->
   <script>
     (function () {
-      var from = new URLSearchParams(location.search).get('from');
-      // Permite entrar si vienes desde la portada; si no, manda a portada con el slug de esta sala
+      var usp = new URLSearchParams(location.search);
+      var from = usp.get('from');
       if (from !== 'portada') {
         location.replace('portada.html?sala=biodiversidad&from=index');
+      }
+      // Si ponemos ?admin=1 en la URL, mostramos el botón admin
+      if (usp.get('admin') === '1') {
+        document.documentElement.style.setProperty('--show-admin', '1');
       }
     })();
   </script>
@@ -39,16 +48,14 @@
         <div id="pillSala" class="pill">Sala: —</div>
       </div>
 
-      
-     <!-- 📊 Botón para ver las jugadas de esta sala -->
-<div class="mt-2 mb-3 text-center">
-  <a href="https://glesantonio4.github.io/entrada-much/dashboard.html?sala_nombre=biodiversidad"
-     target="_blank"
-     class="btn btn-outline-secondary btn-sm">
-    📊 Ver jugadas de esta sala
-  </a>
-</div>
-
+      <!-- 📊 Botón solo para admin (oculto por defecto). Para verlo: .../index.html?from=portada&admin=1 -->
+      <div class="mt-2 mb-3 text-center btn-admin" style="display: var(--show-admin,  none);">
+        <a href="https://glesantonio4.github.io/entrada-much/dashboard.html?sala_nombre=biodiversidad"
+           target="_blank"
+           class="btn btn-outline-secondary btn-sm">
+          📊 Ver jugadas de esta sala
+        </a>
+      </div>
 
       <div class="d-flex align-items-center justify-content-between mt-2 mb-2">
         <div class="w-100 me-3">
@@ -110,5 +117,3 @@
   <script src="app.js"></script>
 </body>
 </html>
-
-
