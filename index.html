@@ -14,13 +14,13 @@
   <!-- Botón “fantasma” por si app.js lo busca (evita errores) -->
   <button id="startBtn" class="visually-hidden" hidden></button>
 
-  <!-- 🔁 REDIRECCIÓN: si entras directo a index, te llevo a portada -->
+  <!-- 🔁 REDIRECCIÓN: si entras directo a index, te llevo a portada con sala=biodiversidad -->
   <script>
     (function () {
       var from = new URLSearchParams(location.search).get('from');
-      // Permite entrar si vienes desde la portada; si no, manda a portada.html
+      // Permite entrar si vienes desde la portada; si no, manda a portada con el slug de esta sala
       if (from !== 'portada') {
-        location.replace('portada.html');
+        location.replace('portada.html?sala=biodiversidad&from=index');
       }
     })();
   </script>
