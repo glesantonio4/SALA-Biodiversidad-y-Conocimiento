@@ -80,6 +80,30 @@ async function startQuizInDB(){
   }
 }
 
+/* ✅ NUEVO: actualizar quiz con puntos y correctas al final */
+async function finishQuizInDB({ puntaje, correctas }){
+  try{
+    await initSupabase();
+    const quiz_id = sessionStorage.getItem('much_current_quiz_id');
+    if (!quiz_id) return;
+
+    const patch = {
+      finished_at: new Date().toISOString(),
+      puntaje_total: puntaje,
+      num_correctas: correctas
+    };
+
+    const { error } = await supabase
+      .from('quizzes')
+      .update(patch)
+      .eq('id', quiz_id);
+
+    if (error) console.warn('finishQuizInDB error:', error.message);
+  }catch(e){
+    console.warn('finishQuizInDB error:', e?.message || e);
+  }
+}
+
 /* =================== Cargar preguntas =================== */
 async function loadPreguntas(){
   try{
@@ -221,6 +245,9 @@ class UIManager{
     }
 
     if(s.idx>=QUESTIONS.length){
+      /* ✅ NUEVO: guardar resultados al terminar, sea ganador o no */
+      finishQuizInDB({ puntaje: s.points, correctas: s.correct });
+
       const allCorrect = s.correct===QUESTIONS.length;
       if(allCorrect){
         const prize = this.prizeMgr.random();
@@ -350,3 +377,4 @@ document.addEventListener('DOMContentLoaded', ()=>{
     start();
   }
 });
+
