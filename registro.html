@@ -24,16 +24,14 @@
     /* ——— Logo responsive ——— */
     .logo-wrap{ display:flex; justify-content:center; margin-bottom:10px; }
     .brand-logo{
-      /* ancho flexible: chico en móvil, más grande en desktop */
       width: clamp(120px, 42vw, 220px);
       max-width: 70%;
-      height: auto;                 /* mantiene proporción */
+      height: auto;
       display:block;
       image-rendering:-webkit-optimize-contrast;
       -ms-interpolation-mode: bicubic;
       filter: drop-shadow(0 2px 8px rgba(0,0,0,.35));
     }
-    /* Opcional: pon la clase 'badge' si tu logo pierde contraste en fondo oscuro */
     .brand-logo.badge{
       background:#fff;
       border-radius:12px;
@@ -62,7 +60,6 @@
     .submit-btn:active{ transform:scale(.995); }
     .submit-btn[disabled]{ opacity:.6; cursor:not-allowed; }
 
-    /* Ajustes muy pequeños (teléfonos angostos) */
     @media (max-width: 360px){
       .registro-container{ padding:18px 16px 22px; }
       h2{ font-size:1.15rem; }
@@ -72,9 +69,7 @@
 </head>
 <body>
   <div class="registro-container">
-    <!-- Logo -->
     <div class="logo-wrap">
-      <!-- Si necesitas más contraste, agrega la clase 'badge' abajo -->
       <img src="./logo-much.png" alt="MUCH · Museo de Ciencia y Tecnología" class="brand-logo">
     </div>
 
@@ -82,7 +77,6 @@
     <p class="lead">Gracias por Visitar el MUCH</p>
 
     <form id="registroForm" autocomplete="off" novalidate>
-      <!-- Nombre -->
       <div class="form-group">
         <label for="nombre">Nombre completo</label>
         <input
@@ -95,7 +89,6 @@
         <div class="error-msg" id="err-nombre"></div>
       </div>
 
-      <!-- Correo -->
       <div class="form-group">
         <label for="correo">Correo electrónico</label>
         <input
@@ -107,7 +100,6 @@
         <div class="error-msg" id="err-correo"></div>
       </div>
 
-      <!-- Teléfono -->
       <div class="form-group">
         <label for="telefono">Número de teléfono</label>
         <input
@@ -126,7 +118,7 @@
 
   <script>
     // ---------- Validadores ----------
-    const reNombre = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:[ \t]+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'.-]+){1,}$/; // ≥2 palabras
+    const reNombre = /^[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]+(?:[ \t]+[A-Za-zÁÉÍÓÚÜÑáéíóúüñ'.-]+){1,}$/;
     const reEmail  = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/i;
     const rePhone  = /^\d{10}$/;
     const disposableDomains = ["10minutemail.com","guerrillamail.com","tempmail.com","yopmail.com","mailinator.com","trashmail.com","sharklasers.com"];
@@ -154,10 +146,10 @@
       return null;
     }
 
-    // ---------- Submit ----------
     let submitting = false;
 
-    $('registroForm').addEventListener('submit', function(e){
+    // ✅ Hacemos el submit async para poder esperar Supabase
+    $('registroForm').addEventListener('submit', async function(e){
       e.preventDefault();
       if (submitting) return;
       submitting = true;
@@ -167,7 +159,6 @@
       const correo   = $('correo').value;
       const telefono = $('telefono').value;
 
-      // Validar campos
       let ok = true;
       const nErr = validateNombre(nombre);  if (nErr){ ok=false; setError($('nombre'), $('err-nombre'), nErr); } else { clearError($('nombre'), $('err-nombre')); }
       const cErr = validateEmail(correo);   if (cErr){ ok=false; setError($('correo'), $('err-correo'), cErr); } else { clearError($('correo'), $('err-correo')); }
@@ -179,14 +170,12 @@
         return;
       }
 
-      // Intentar leer el premio que dejó el juego (much_quiz_prize)
       let prizeData = null;
       try{
         const raw = localStorage.getItem('much_quiz_prize');
         if (raw) prizeData = JSON.parse(raw);
       }catch(_){}
 
-      // Plan B
       if (!prizeData){
         const folio = 'MUCH-' + Math.random().toString(36).substring(2,8).toUpperCase();
         prizeData = {
@@ -200,23 +189,37 @@
         try { localStorage.setItem('much_quiz_prize', JSON.stringify(prizeData)); } catch(_){}
       }
 
-      // Build params
+      const nombreLimpio = nombre.trim().replace(/\s+/g,' ');
+      const correoLimpio = correo.trim().toLowerCase();
+      const telLimpio    = telefono.trim();
+
       const params = new URLSearchParams({
-        nombre:   nombre.trim().replace(/\s+/g,' '),
-        correo:   correo.trim().toLowerCase(),
-        telefono: telefono.trim(),
+        nombre:   nombreLimpio,
+        correo:   correoLimpio,
+        telefono: telLimpio,
         premio:   prizeData.label || '',
         folio:    prizeData.folio || '',
         lugar:    prizeData.lugar || ''
       });
 
-      // Evitar doble canje
+      // ✅ Guardar en Supabase si la función global existe
+      try{
+        if (window.saveRegistroToSupabase){
+          await window.saveRegistroToSupabase({
+            nombre: nombreLimpio,
+            correo: correoLimpio,
+            telefono: telLimpio,
+            premio: prizeData.label || '',
+            folio:  prizeData.folio || ''
+          });
+        }
+      }catch(_){}
+
       try { localStorage.removeItem('much_quiz_prize'); } catch(_){}
 
       window.location.href = 'boleto.html?' + params.toString();
     });
 
-    // Limpieza de errores
     ['nombre','correo','telefono'].forEach(id=>{
       $(id).addEventListener('input', () => {
         const map = {
@@ -229,6 +232,77 @@
         if (msg) setError($(id), errEl, msg); else clearError($(id), errEl);
       });
     });
+  </script>
+
+  <!-- ✅ Nuevo módulo: lógica Supabase para participantes + boletos -->
+  <script type="module">
+    import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+
+    const SUPABASE_URL = 'https://qwgaeorsymfispmtsbut.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3Z2Flb3JzeW1maXNwbXRzYnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzODcyODUsImV4cCI6MjA3Nzk2MzI4NX0.FThZIIpz3daC9u8QaKyRTpxUeW0v4QHs5sHX2s1U1eo';
+
+    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function upsertParticipante(nombre, correo, telefono){
+      try{
+        let { data, error } = await supabase
+          .from('participantes')
+          .select('id')
+          .eq('correo', correo)
+          .limit(1);
+
+        if (!error && data && data.length){
+          return data[0].id;
+        }
+
+        ({ data, error } = await supabase
+          .from('participantes')
+          .insert({ nombre, correo, telefono })
+          .select('id')
+          .single());
+
+        if (error){
+          console.warn('Error insertando participante:', error.message);
+          return null;
+        }
+        return data?.id || null;
+      }catch(e){
+        console.warn('upsertParticipante error:', e?.message || e);
+        return null;
+      }
+    }
+
+    function addDays(date, days){
+      return new Date(date.getTime() + days*24*60*60*1000);
+    }
+
+    async function crearBoleto({ participante_id, folio }){
+      if (!participante_id || !folio) return;
+      try{
+        const hoy = new Date();
+        const desde = hoy.toISOString().slice(0,10);
+        const hasta = addDays(hoy, 7).toISOString().slice(0,10);
+
+        const payload = {
+          participante_id,
+          folio,
+          valido_desde: desde,
+          valido_hasta: hasta
+          // premio_id: null  // opcional, si luego quieres vincular con tabla premios
+        };
+
+        const { error } = await supabase.from('boletos').insert(payload);
+        if (error) console.warn('Error creando boleto:', error.message);
+      }catch(e){
+        console.warn('crearBoleto error:', e?.message || e);
+      }
+    }
+
+    // Exponer una función global que el otro script pueda usar
+    window.saveRegistroToSupabase = async function({ nombre, correo, telefono, premio, folio }){
+      const participante_id = await upsertParticipante(nombre, correo, telefono);
+      await crearBoleto({ participante_id, folio });
+    };
   </script>
 </body>
 </html>
