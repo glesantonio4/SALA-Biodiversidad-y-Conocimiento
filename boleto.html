@@ -202,7 +202,7 @@
   })();
   </script>
 
-  <!-- ✅ Nuevo: conexión con Supabase para asegurar que el boleto quede registrado -->
+  <!-- ✅ Supabase: registrar boleto (participante + premio_id + folio) si no existe -->
   <script type="module">
     import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -228,7 +228,7 @@
     const nombre = nombreRaw.trim().replace(/\s+/g,' ');
     const correo = correoRaw.trim().toLowerCase();
     const telefono = telRaw.trim();
-    const premio = (prizeData?.label) || premioRaw || 'Entrada general';
+    const premioLabel = (prizeData?.label) || premioRaw || 'Entrada general';
     const folio  = (prizeData?.folio) || folioRaw  || null;
 
     function addDays(date, days){
@@ -236,7 +236,7 @@
     }
 
     async function upsertParticipante(nombre, correo, telefono){
-      if (!correo) return null; // sin correo no podemos hacer upsert confiable
+      if (!correo) return null;
       try{
         let { data, error } = await supabase
           .from('participantes')
@@ -265,7 +265,33 @@
       }
     }
 
-    async function ensureBoleto({ participante_id, folio }){
+    async function getPremioId(premioLabel){
+      try{
+        let query = supabase.from('premios').select('id, nombre, tipo').limit(1);
+
+        const lower = (premioLabel || '').toLowerCase();
+        if (lower.includes('planetario')){
+          query = query.eq('tipo','planetario');
+        }else if (lower.includes('museo')){
+          query = query.eq('tipo','museo');
+        }else if (premioLabel){
+          query = query.ilike('nombre', premioLabel);
+        }
+
+        const { data, error } = await query;
+        if (error){
+          console.warn('[boleto] Error buscando premio:', error.message);
+          return null;
+        }
+        if (data && data.length) return data[0].id;
+        return null;
+      }catch(e){
+        console.warn('[boleto] getPremioId error:', e?.message || e);
+        return null;
+      }
+    }
+
+    async function ensureBoleto({ participante_id, folio, premioLabel }){
       if (!participante_id || !folio) return;
       try{
         // ¿Ya existe este folio?
@@ -276,21 +302,23 @@
           .limit(1);
 
         if (!error && data && data.length){
-          // Ya está registrado, no hacemos nada
-          return;
+          return; // ya está
         }
 
         const hoy = new Date();
         const desde = hoy.toISOString().slice(0,10);
         const hasta = addDays(hoy, 7).toISOString().slice(0,10);
 
+        const premio_id = await getPremioId(premioLabel);
+
         const payload = {
           participante_id,
           folio,
           valido_desde: desde,
           valido_hasta: hasta
-          // Si luego agregas columna premio_id, aquí puedes relacionarla
         };
+
+        if (premio_id) payload.premio_id = premio_id;
 
         ({ error } = await supabase.from('boletos').insert(payload));
         if (error){
@@ -308,7 +336,7 @@
           return;
         }
         const participante_id = await upsertParticipante(nombre, correo, telefono);
-        await ensureBoleto({ participante_id, folio });
+        await ensureBoleto({ participante_id, folio, premioLabel });
       }catch(e){
         console.warn('[boleto] Error general conectando con BD:', e?.message || e);
       }
