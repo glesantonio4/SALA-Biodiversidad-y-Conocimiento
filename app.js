@@ -1,6 +1,6 @@
-/* =================== Datos =================== */
+/* =================== Datos de Configuración =================== */
 const params = new URLSearchParams(location.search);
-const SALA = params.get('sala') || 'biodiversidad';   // <- slug por defecto para esta sala
+const SALA = params.get('sala') || 'biodiversidad';
 const NUM_QUESTIONS = 6;
 // Función para mezclar arrays
 const shuffle = a => a.map(x => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
@@ -17,7 +17,7 @@ let quizIniciando = false;
 const SUPABASE_URL = 'https://qwgaeorsymfispmtsbut.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3Z2Flb3JzeW1maXNwbXRzYnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzODcyODUsImV4cCI6MjA3Nzk2MzI4NX0.FThZIIpz3daC9u8QaKyRTpxUeW0v4QHs5sHX2s1U1eo';
 
-// 🔒 ID EXACTO DE LA SALA "" (Sustituido para Sala Biodiversidad)
+// 🔒 ID EXACTO DE LA SALA "BIODIVERSIDAD"
 const SALA_ENTRADA_ID = '4bdffb5f-1a55-4952-be0c-9d487550fb0c';
 
 let supabase = null;
