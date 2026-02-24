@@ -33,7 +33,6 @@ async function initSupabase() {
 // ⏰ FUNCIÓN CRÍTICA: Obtener hora exacta de México
 function getMexicoTime() {
   const ahora = new Date();
-  // Restamos el desfase (en minutos) para ajustar a hora local manualmente
   const offsetMexico = ahora.getTimezoneOffset() * 60000;
   const localTime = new Date(ahora.getTime() - offsetMexico);
   return localTime.toISOString();
@@ -114,11 +113,8 @@ async function loadPreguntas() {
 }
 
 // ------------------------------------------------------------
-// ------------------------------------------------------------
 // 2. GESTIÓN DE PARTIDAS (DB TRACKING)
 // ------------------------------------------------------------
-// Se registra el intento en 'quizzes' SIEMPRE.
-// 'Ganadores' solo se toca si el usuario se registra al final.
 
 async function startQuizInDB() {
   if (quizIniciando) return sessionStorage.getItem('much_current_quiz_id');
@@ -127,20 +123,20 @@ async function startQuizInDB() {
   try {
     await initSupabase();
 
-    // Reset de seguridad
+    // Reset de seguridad local
     sessionStorage.removeItem('much_quiz_final_data');
 
-    // 1. Recuperar Quiz Activo (reload)
+    // Validar si ya hay un juego activo en esta sesión
     const juegoActivo = sessionStorage.getItem('much_current_quiz_id');
-    if (juegoActivo) {
-      // Validar si es reciente? (Opcional)
-      return juegoActivo;
-    }
+    if (juegoActivo) return juegoActivo;
 
-    // 2. Insertar nuevo intento (participante_id = NULL)
+    // 🌟 SE ESTABLECE EL ID MANUALMENTE COMO SE PIDIÓ
+    const ID_JUGADOR = 365;
+
+    // Insertar nuevo intento
     const payload = {
       sala_id: SALA_ENTRADA_ID,
-      participante_id: null, // Se vinculará en registro.html si gana
+      participante_id: ID_JUGADOR, // ✅ Ya no será NULL
       started_at: getMexicoTime(),
       num_preguntas: NUM_QUESTIONS,
       puntaje_total: 0,
@@ -157,14 +153,20 @@ async function startQuizInDB() {
 
     if (error) {
       console.error("❌ Error Supabase (Start):", error.message);
+      // Alerta para que veas si hay otro problema oculto
+      alert("Error al guardar en BD: " + error.message);
       quizIniciando = false;
-      // Fallback: Modo Local
       startQuizLocal();
       return null;
     }
 
-    console.log("✅ Intento iniciado. ID:", data.id);
+    console.log("✅ Intento guardado correctamente. ID:", data.id);
+
+    // Guardamos en memoria para que registro.html actualice a este usuario al final
     sessionStorage.setItem('much_current_quiz_id', data.id);
+    localStorage.setItem('much_quiz_db_id', String(data.id));
+    localStorage.setItem('much_quiz_last_quiz_id', String(data.id));
+
     return data.id;
 
   } catch (e) {
@@ -176,7 +178,6 @@ async function startQuizInDB() {
 }
 
 async function endQuizInDB({ puntaje_total, num_correctas, num_preguntas }) {
-  // Guardamos local también por si acaso (para registro.html fallback)
   saveQuizResultLocal({ puntaje_total, num_correctas, num_preguntas });
 
   try {
@@ -195,27 +196,31 @@ async function endQuizInDB({ puntaje_total, num_correctas, num_preguntas }) {
     }).eq('id', quizId);
 
     if (error) console.error("Error al finalizar (DB):", error.message);
-    else console.log("✅ Intento actualizado en BD.");
+    else console.log("✅ Intento actualizado en BD al finalizar.");
 
   } catch (e) { console.warn('Error endQuizInDB:', e); }
 }
 
-// Fallback Functions (mantenidas)
+// Fallback Functions
 function startQuizLocal() {
   if (sessionStorage.getItem('much_quiz_start')) return;
   const startTime = getMexicoTime();
   sessionStorage.setItem('much_quiz_start', startTime);
 }
+
 function saveQuizResultLocal(data) {
   const startTime = sessionStorage.getItem('much_quiz_start') || getMexicoTime();
   const quizData = { ...data, sala_id: SALA_ENTRADA_ID, started_at: startTime, finished_at: getMexicoTime() };
+
   localStorage.setItem('much_quiz_final_data', JSON.stringify(quizData));
 
-  // Guardamos el ID de BD para que registro.html pueda usarlo
+  // Reforzamos el ID en localStorage
   const dbId = sessionStorage.getItem('much_current_quiz_id');
-  if (dbId) localStorage.setItem('much_quiz_db_id', dbId);
+  if (dbId) {
+    localStorage.setItem('much_quiz_db_id', dbId);
+    localStorage.setItem('much_quiz_last_quiz_id', dbId);
+  }
 }
-
 
 /* =================== Clases UI =================== */
 class SoundFX {
@@ -356,21 +361,14 @@ class UIManager {
 
     if (s.idx >= QUESTIONS.length) {
       const allCorrect = s.correct === QUESTIONS.length;
-
-      // --- CORRECCIÓN FINAL: GUARDAR PUNTAJE EN DB Y LOCAL ---
-      // Calculamos 10 puntos por cada acierto
       const puntajeFinal = s.correct * 10;
 
-      // 1. Guardar localmente (backup para registro.html)
       saveQuizResultLocal({
         puntaje_total: puntajeFinal,
         num_correctas: s.correct,
         num_preguntas: QUESTIONS.length
       });
 
-      // 2. Actualizar intento en BD (quizzes)
-      // No usamos await aquí para no bloquear la UI si la red es lenta, 
-      // pero idealmente debería ser rápido.
       endQuizInDB({
         puntaje_total: puntajeFinal,
         num_correctas: s.correct,
@@ -380,7 +378,6 @@ class UIManager {
       if (allCorrect) {
         const prize = this.prizeMgr.random();
         this.currentPrize = prize;
-        // Damos un pequeño margen para que el update viaje antes del redirect
         setTimeout(() => this.redirectToRegistration(), 500);
         return;
       } else {
@@ -492,8 +489,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   const start = async () => {
     try {
-      await loadPreguntas(); // Carga el JSON local
-      startQuizInDB(); // Inicia sesión en BD (o fallback local)
+      await loadPreguntas();
+      startQuizInDB();
       if (welcome) welcome.classList.add('hidden');
       if (quizShell) quizShell.classList.remove('hidden');
       new UIManager({ elements, sound, confetti, prizeMgr });
