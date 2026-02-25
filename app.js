@@ -1,6 +1,6 @@
 /* =================== Datos de Configuración =================== */
 const params = new URLSearchParams(location.search);
-const SALA = params.get('sala') || 'biodiversidad';
+const SALA = params.get('sala') || 'desarrollo-sustentable';
 const NUM_QUESTIONS = 6;
 // Función para mezclar arrays
 const shuffle = a => a.map(x => [Math.random(), x]).sort((p, q) => p[0] - q[0]).map(p => p[1]);
@@ -17,7 +17,7 @@ let quizIniciando = false;
 const SUPABASE_URL = 'https://qwgaeorsymfispmtsbut.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InF3Z2Flb3JzeW1maXNwbXRzYnV0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjIzODcyODUsImV4cCI6MjA3Nzk2MzI4NX0.FThZIIpz3daC9u8QaKyRTpxUeW0v4QHs5sHX2s1U1eo';
 
-// 🔒 ID EXACTO DE LA SALA "BIODIVERSIDAD"
+// 🔒 ID EXACTO DE LA SALA "DESARROLLO SUSTENTABLE"
 const SALA_ENTRADA_ID = '4bdffb5f-1a55-4952-be0c-9d487550fb0c';
 
 let supabase = null;
@@ -123,17 +123,15 @@ async function startQuizInDB() {
   try {
     await initSupabase();
 
-    // Reset de seguridad local
+    // 🌟 LA CLAVE ESTÁ AQUÍ: Borramos el ID del intento anterior 
+    // para obligar a la base de datos a crear siempre una FILA NUEVA.
+    sessionStorage.removeItem('much_current_quiz_id');
     sessionStorage.removeItem('much_quiz_final_data');
-
-    // Validar si ya hay un juego activo en esta sesión
-    const juegoActivo = sessionStorage.getItem('much_current_quiz_id');
-    if (juegoActivo) return juegoActivo;
 
     // 🌟 SE ESTABLECE EL ID MANUALMENTE COMO SE PIDIÓ
     const ID_JUGADOR = 365;
 
-    // Insertar nuevo intento
+    // Insertar nuevo intento SIEMPRE
     const payload = {
       sala_id: SALA_ENTRADA_ID,
       participante_id: ID_JUGADOR, // ✅ Ya no será NULL
@@ -144,7 +142,7 @@ async function startQuizInDB() {
       estatus: 'activo'
     };
 
-    console.log("Guardando intento en BD...");
+    console.log("Guardando nuevo intento en BD...");
     const { data, error } = await supabase
       .from('quizzes')
       .insert(payload)
@@ -153,16 +151,15 @@ async function startQuizInDB() {
 
     if (error) {
       console.error("❌ Error Supabase (Start):", error.message);
-      // Alerta para que veas si hay otro problema oculto
       alert("Error al guardar en BD: " + error.message);
       quizIniciando = false;
       startQuizLocal();
       return null;
     }
 
-    console.log("✅ Intento guardado correctamente. ID:", data.id);
+    console.log("✅ Nuevo Intento guardado correctamente. ID:", data.id);
 
-    // Guardamos en memoria para que registro.html actualice a este usuario al final
+    // Guardamos el nuevo ID en memoria
     sessionStorage.setItem('much_current_quiz_id', data.id);
     localStorage.setItem('much_quiz_db_id', String(data.id));
     localStorage.setItem('much_quiz_last_quiz_id', String(data.id));
@@ -200,6 +197,51 @@ async function endQuizInDB({ puntaje_total, num_correctas, num_preguntas }) {
 
   } catch (e) { console.warn('Error endQuizInDB:', e); }
 }
+
+// ------------------------------------------------------------
+// 🌟 NUEVO: FUNCIÓN PARA COMPROBAR LÍMITE DE BOLETOS DIARIOS
+// ------------------------------------------------------------
+async function checkLimiteBoletos() {
+  try {
+    await initSupabase();
+
+    // Obtener el inicio y fin del día actual (hora de México)
+    const hoy = new Date();
+    const offsetMexico = hoy.getTimezoneOffset() * 60000;
+    const localTime = new Date(hoy.getTime() - offsetMexico);
+
+    // Formatear a YYYY-MM-DD
+    const fechaHoyStr = localTime.toISOString().split('T')[0];
+
+    // Construir rangos de búsqueda (desde las 00:00:00 hasta las 23:59:59)
+    const inicioDia = `${fechaHoyStr}T00:00:00.000Z`;
+    const finDia = `${fechaHoyStr}T23:59:59.999Z`;
+
+    // Buscar cuántos juegos con puntaje perfecto (todos los aciertos) hay hoy para esta sala
+    const { count, error } = await supabase
+      .from('quizzes')
+      .select('*', { count: 'exact', head: true })
+      .eq('sala_id', SALA_ENTRADA_ID)
+      .gte('finished_at', inicioDia) // Mayor o igual que el inicio del día
+      .lte('finished_at', finDia)    // Menor o igual que el fin del día
+      .eq('num_correctas', NUM_QUESTIONS); // Solo cuentan los que ganaron el boleto
+
+    if (error) {
+      console.error("Error al checar límite de boletos:", error);
+      return false; // Si hay error, permitimos que pase para no bloquear injustamente
+    }
+
+    console.log(`Boletos entregados hoy en esta sala: ${count}`);
+
+    // Si ya hay 3 o más, se alcanzó el límite
+    return count >= 3;
+
+  } catch (e) {
+    console.error("Excepción en checkLimiteBoletos:", e);
+    return false;
+  }
+}
+
 
 // Fallback Functions
 function startQuizLocal() {
@@ -341,7 +383,7 @@ class UIManager {
     window.location.href = 'registro.html';
   }
 
-  render() {
+  async render() {
     const s = this.state, { e } = this;
     const pct = Math.min(100, (s.idx / QUESTIONS.length * 100));
     e.bar.style.width = pct + '%';
@@ -360,6 +402,14 @@ class UIManager {
     }
 
     if (s.idx >= QUESTIONS.length) {
+      // Mostrar estado de "cargando" mientras checamos la BD
+      e.quizView.classList.add('d-none');
+      e.finalView.classList.remove('d-none');
+      e.finalTitle.textContent = 'Verificando resultados...';
+      e.finalMsg.textContent = 'Por favor espera.';
+      e.giftRow.classList.add('d-none');
+      e.retryRow.classList.add('d-none');
+
       const allCorrect = s.correct === QUESTIONS.length;
       const puntajeFinal = s.correct * 10;
 
@@ -375,21 +425,36 @@ class UIManager {
         num_preguntas: QUESTIONS.length
       });
 
+      e.finalPoints.textContent = s.points.toString();
+      e.finalCorrect.textContent = s.correct.toString();
+      e.finalTotal.textContent = QUESTIONS.length.toString();
+
       if (allCorrect) {
-        const prize = this.prizeMgr.random();
-        this.currentPrize = prize;
-        setTimeout(() => this.redirectToRegistration(), 500);
+        // 🌟 ANTES DE DAR EL PREMIO, REVISAMOS EL LÍMITE
+        const limiteAlcanzado = await checkLimiteBoletos();
+
+        if (limiteAlcanzado) {
+          // Ya se entregaron 3 boletos hoy
+          e.finalTitle.textContent = '¡Felicidades, eres un experto! 🧠';
+          e.finalMsg.innerHTML = '<span style="color: #e6007a; font-weight: bold;">Lo sentimos, los boletos para esta sala se han agotado por hoy.</span><br>¡Vuelve a intentarlo mañana!';
+          e.retryRow.classList.remove('d-none'); // Solo mostrar botón de volver a intentar
+        } else {
+          // Aún hay boletos disponibles
+          const prize = this.prizeMgr.random();
+          this.currentPrize = prize;
+
+          e.finalTitle.textContent = '¡Felicidades!';
+          e.finalMsg.textContent = '¡Has ganado un boleto!';
+          e.giftRow.classList.remove('d-none');
+
+          // Pequeño margen y redirigir
+          setTimeout(() => this.redirectToRegistration(), 500);
+        }
         return;
       } else {
-        e.quizView.classList.add('d-none');
-        e.finalView.classList.remove('d-none');
         e.finalTitle.textContent = 'Buen intento 👀';
         e.finalMsg.textContent = 'Sigue explorando el museo.';
-        e.giftRow.classList.add('d-none');
         e.retryRow.classList.remove('d-none');
-        e.finalPoints.textContent = s.points.toString();
-        e.finalCorrect.textContent = s.correct.toString();
-        e.finalTotal.textContent = QUESTIONS.length.toString();
         return;
       }
     }
