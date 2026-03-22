@@ -125,9 +125,21 @@
     <h1>MUCH</h1>
     <p class="sub">Aprende y gana premios!! 🌋</p>
 
-    <a class="btn" href="index.html?from=portada">Jugar ahora 🦕</a>
+    <a class="btn" href="index.html?from=portada" id="startLink">Jugar ahora 🦕</a>
     <p class="tip">Tip: Lee cuidasosamente las preguntas 🦉</p>
   </main>
+  <script>
+    (function() {
+      const qs = new URLSearchParams(window.location.search);
+      const startLink = document.getElementById('startLink');
+      if (startLink && qs.toString()) {
+        const base = startLink.getAttribute('href');
+        // Unimos los parámetros actuales con los que ya tiene el link
+        const separator = base.includes('?') ? '&' : '?';
+        startLink.setAttribute('href', base + separator + qs.toString());
+      }
+    })();
+  </script>
 </body>
 </html>
 
