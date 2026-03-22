@@ -358,7 +358,7 @@
       el('tNombre').textContent = qs.get('nombre') || '—';
       el('tPremio').textContent = acceso;
       el('tFecha').textContent = `${fmt.format(hoy)} al ${fmt.format(fin)}`;
-      el('tLugar').innerHTML = ubicacion;
+      el('tLugar').textContent = ubicacion;
       el('tCorreo').textContent = qs.get('correo') || '—';
       el('tTel').textContent = qs.get('telefono') || '—';
     })();
@@ -375,12 +375,10 @@
 
       if (folio && container) {
         // Detectamos si es local o producción para crear el link correcto
-        const isLocal = window.location.href.includes('localhost') || window.location.href.includes('127.0.0.1');
+        const currentDir = window.location.href.replace(/\/[^/?#]+(\?.*)?$/, '');
 
         // AJUSTA '/entrada-much' si tu carpeta local tiene otro nombre
-        const baseUrl = isLocal
-          ? window.location.origin + '/entrada-much'
-          : 'https://glesantonio4.github.io/entrada-much';
+        const baseUrl = currentDir;
 
         // Link final que leerá el guardia
         const validationUrl = `${baseUrl}/validar.html?folio=${folio}`;

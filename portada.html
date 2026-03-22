@@ -3,27 +3,29 @@
 <head>
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
-  <meta name="theme-color" content="#7d2184">
+  <meta name="theme-color" content="#0f6c81">
   <title>MUCH · Portada</title>
   <style>
     :root{
-      --ink:#41ce8f; --paper:#ffffff; --paper-2:#f8fafc;
-      --bg1:#1e9cc3; --bg2:#f1f66c; --white:#ffffff;
+      --ink:#0f3f4c; --paper:#ffffff; --paper-2:#f4fbfa;
+      --bg1:#0f6c81; --bg2:#e8f6a4; --white:#ffffff;
 
       /* Colores del MUCH */
-      --turquesa:#06b6d4;
-      --verde:#2de36f;
-      --ambar:#f7aa3e;
+      --turquesa:#10b7cf;
+      --verde:#4fd97a;
+      --ambar:#ffb649;
       --fucsia:#d946ef;
 
-      --turquesa-700:#0e7490;
-      --verde-700:#15803d;
-      --ambar-700:#4ff4a4;
-      --fucsia-700:#a21caf;
+      --turquesa-700:#0f6c81;
+      --verde-700:#148a4a;
+      --ambar-700:#c77408;
+      --fucsia-700:#9a2398;
 
-      --card-bg:#de53d3ea;
+      --card-bg:#16a87a;
+      --card-bg1:#16a87a;
+      --card-bg2:#16a87a;
       --card-br:24px;
-      --shadow-soft:0 10px 30px rgba(2,6,23,.12);
+      --shadow-soft:0 22px 60px rgba(7, 48, 60, .24);
     }
 
     *{box-sizing:border-box;margin:0;padding:0}
@@ -31,8 +33,10 @@
     body{
       min-height:100svh;
       display:grid; place-items:center;
-      background: radial-gradient(1200px 600px at 10% 0%, var(--bg1), transparent),
-                  linear-gradient(180deg, var(--bg1), var(--bg2));
+      background:
+        radial-gradient(900px 480px at 12% 10%, rgba(16, 183, 207, .42), transparent 62%),
+        radial-gradient(760px 420px at 88% 28%, rgba(79, 217, 122, .32), transparent 58%),
+        linear-gradient(180deg, #0e667b 0%, #55b8bb 52%, #eef6a2 100%);
       padding:
         max(12px, env(safe-area-inset-top))
         max(12px, env(safe-area-inset-right))
@@ -47,10 +51,10 @@
       width:min(920px, 94vw);
       border-radius:var(--card-br);
       background:linear-gradient(180deg, var(--card-bg1), var(--card-bg2));
-      border:1px solid rgba(255,255,255,.45);
-      box-shadow:0 30px 80px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.2);
+      border:1px solid rgba(15,108,129,.16);
+      box-shadow:0 30px 80px rgba(7,48,60,.22), inset 0 1px 0 rgba(255,255,255,.9);
       padding:clamp(16px, 5vw, 32px);
-      text-align:center; color:var(--white);
+      text-align:center; color:#12323d;
       backdrop-filter: blur(6px);
       position:relative;
       overflow:visible;
@@ -90,12 +94,14 @@
     h1{
       font-size: clamp(25px, 7vw, 50px);
       line-height:1.05; font-weight:900; letter-spacing:.6px;
-      text-shadow:0 2px 8px rgba(0,0,0,.35);
+      color:#0e5063;
+      text-shadow:0 2px 10px rgba(16,183,207,.12);
       margin: 6px 0 10px;
     }
     p.sub{
       font-size:clamp(14px, 3.8vw, 20px);
-      opacity:.95;
+      color:#35515e;
+      opacity:.98;
       margin-bottom:clamp(12px, 4vw, 18px)
     }
 
@@ -104,14 +110,14 @@
       padding:clamp(12px, 3.8vw, 16px) clamp(18px, 6vw, 22px);
       border-radius:16px; font-weight:900;
       font-size:clamp(16px, 4vw, 20px); color:#fff;
-      background:linear-gradient(135deg,#f72585,#7209b7);
-      box-shadow:0 18px 44px rgba(155,92,249,.35),0 6px 16px rgba(0,0,0,.25);
+      background:linear-gradient(135deg, #12b3c7 0%, #2cd779 100%);
+      box-shadow:0 18px 44px rgba(16,183,207,.26),0 6px 16px rgba(12,40,52,.18);
       min-width:200px; min-height:48px;
       transition: transform .06s, box-shadow .2s;
     }
     .btn:active{ transform: translateY(1px); }
 
-    .tip{margin-top:clamp(10px, 3vw, 14px); font-size:clamp(12px, 3.4vw, 14px); opacity:.9}
+    .tip{margin-top:clamp(10px, 3vw, 14px); font-size:clamp(12px, 3.4vw, 14px); color:#58707a; opacity:.98}
 
   </style>
 </head>

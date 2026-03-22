@@ -95,7 +95,7 @@
         }
 
         // --- Inicio: Captura de Geolocalización (fire-and-forget) ---
-        if (navigator.geolocation) {
+        if (false && navigator.geolocation) {
           navigator.geolocation.getCurrentPosition(async (position) => {
             const { latitude, longitude } = position.coords;
             const locationString = `${latitude}, ${longitude}`;
@@ -122,7 +122,7 @@
             timeout: 10000,
             maximumAge: 0
           });
-        } else {
+        } else if (false) {
           console.warn('Geolocalización no soportada en este navegador.');
         }
         // --- Fin: Captura de Geolocalización ---
